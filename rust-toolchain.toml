@@ -1,3 +1,7 @@
+# Development toolchain. The minimum supported version is `rust-version` in
+# Cargo.toml (checked in CI). Editor tooling (rust-analyzer, rust-src) comes
+# from the Nix dev shell or `rustup component add`.
 [toolchain]
 channel = "stable"
-components = ["clippy", "rustfmt", "rust-analyzer", "rust-src", "rust-std"]
+components = ["clippy", "rustfmt"]
+profile = "minimal"

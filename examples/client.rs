@@ -1,14 +1,26 @@
-extern crate discloud_rs;
-use std::env;
+//! Prints the account information of the token owner.
+//!
+//! `cargo run --example client`
 
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
-
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let user = client.get_user_info().await.unwrap();
-
-    println!("{user:#?}");
+async fn main() -> Result<(), Box<dyn Error>> {
+    let user = client()?.get_user_info().await?;
+    println!(
+        "{} on plan {}: {}/{} MB of RAM used, {} apps",
+        user.user_id,
+        user.plan,
+        user.used_ram,
+        user.total_ram,
+        user.apps.len()
+    );
+    Ok(())
 }

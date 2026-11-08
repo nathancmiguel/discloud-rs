@@ -1,24 +1,25 @@
-extern crate discloud_rs;
-use std::env;
+//! Restarts an application.
+//!
+//! `cargo run --example apps_manage_restart -- APP_ID`
 
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
+fn app_id_arg() -> Result<String, Box<dyn Error>> {
+    std::env::args()
+        .nth(1)
+        .ok_or_else(|| "pass the application ID as the first argument".into())
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
-
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let apps = client.get_all_apps().await.unwrap();
-
-    println!("All apps fetched: {apps:?}");
-
-    match apps.first() {
-        Some(app) => {
-            app.restart(&client).await.unwrap(); // Or client.restart_app(&a.id);
-            println!("Restarted app: {app:#?}");
-        }
-        None => {
-            println!("No app to restart");
-        }
-    }
+async fn main() -> Result<(), Box<dyn Error>> {
+    client()?.restart_app(&app_id_arg()?).await?;
+    println!("Restarted");
+    Ok(())
 }

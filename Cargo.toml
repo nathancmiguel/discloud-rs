@@ -1,23 +1,49 @@
 [package]
 name = "discloud-rs"
 version = "0.4.0"
-authors = ["jackskelt", "nathancmiguel]
-description = "A rust wrapper for Discloud's API"
+authors = ["jackskelt", "nathancmiguel"]
+description = "An async Rust wrapper for the Discloud hosting API"
 repository = "https://github.com/jackskelt/discloud-rs"
+documentation = "https://docs.discloud.com/api-and-integrations/api-overview"
+readme = "README.md"
 license = "Apache-2.0"
 keywords = ["discloud", "hosting", "api", "wrapper"]
-categories = ["api-bindings"]
+categories = ["api-bindings", "asynchronous", "web-programming::http-client"]
 edition = "2024"
+# Bounded by reqwest 0.13 and tokio 1.54 (both require 1.85), and by edition 2024.
+rust-version = "1.85"
+include = ["src/**/*.rs", "examples/**/*.rs", "tests/**/*.rs", "README.md", "CHANGELOG.md", "LICENSE", "Cargo.toml"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[features]
+default = ["rustls"]
+## Use rustls (with the aws-lc-rs provider and the platform certificate verifier).
+rustls = ["reqwest/rustls"]
+## Use the platform's native TLS stack (OpenSSL on Linux, SChannel on Windows, Security.framework on macOS).
+native-tls = ["reqwest/native-tls"]
 
 [dependencies]
-reqwest = { version = "0.13", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tracing = "0.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["charset", "http2", "json", "multipart", "stream", "system-proxy"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+thiserror = "2.0.17"
+tracing = "0.1.41"
 
 [dev-dependencies]
-tokio = { version = "1.54", features = ["macros", "rt-multi-thread"] }
-tracing-subscriber = "0.3"
 dotenvy = "0.15"
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wiremock = "0.6"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

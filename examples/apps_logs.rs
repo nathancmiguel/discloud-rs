@@ -1,22 +1,26 @@
-extern crate discloud_rs;
-use std::env;
+//! Prints the recent logs of an application.
+//!
+//! `cargo run --example apps_logs -- APP_ID`
 
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
+fn app_id_arg() -> Result<String, Box<dyn Error>> {
+    std::env::args()
+        .nth(1)
+        .ok_or_else(|| "pass the application ID as the first argument".into())
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
-
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let apps = client.get_all_apps().await.unwrap();
-
-    match apps.first() {
-        Some(app) => {
-            let logs = app.get_logs(&client).await.unwrap(); // or client.get_app_logs(&app.id)
-            println!("Fetched app logs: {logs:#?}");
-        }
-        None => {
-            println!("No app to fetch logs");
-        }
-    }
+async fn main() -> Result<(), Box<dyn Error>> {
+    let logs = client()?.get_app_logs(&app_id_arg()?).await?;
+    println!("{}", logs.terminal.small.as_deref().unwrap_or("<no logs>"));
+    println!("Full logs: {}", logs.terminal.url);
+    Ok(())
 }

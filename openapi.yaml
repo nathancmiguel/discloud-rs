@@ -35,11 +35,24 @@ components:
   schemas:
     Error:
       type: object
+      description: >-
+        Error body. Most routes send `status` and `message`; newer routes add a
+        machine-readable `code` (an HTTP-like integer or a string such as
+        `SNAPSHOT:APP_BUSY`) and sometimes extra `data`.
       properties:
+        status:
+          type: string
+          enum:
+            - error
         code:
-          type: integer
+          oneOf:
+            - type: integer
+            - type: string
         message:
           type: string
+        data:
+          type: object
+          description: Additional details (for example the clusters of a CLUSTER_MISMATCH)
     User:
       type: object
       properties:
@@ -190,6 +203,24 @@ components:
         autoRestart:
           type: boolean
           description: Whether the application auto-restarts on failure
+        apts:
+          description: Installed APT packages (sent as an empty string when there are none)
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        clusterName:
+          type: string
+        exitCode:
+          type: integer
+          nullable: true
+        online:
+          type: boolean
+        ramKilled:
+          type: boolean
+        syncGit:
+          $ref: "#/components/schemas/SyncGit"
     UploadResponse:
       type: object
       properties:
@@ -236,6 +267,7 @@ components:
           x-gitbook-description-html: <p>Whether the application was terminated due to RAM usage</p>
         exitCode:
           type: integer
+          nullable: true
           description: Exit code of the application if it has stopped
           x-gitbook-description-html: <p>Exit code of the application if it has stopped</p>
         ram:
@@ -274,6 +306,14 @@ components:
           type: integer
           description: Timestamp (in milliseconds) of when the application was uploaded
           x-gitbook-description-html: <p>Timestamp (in milliseconds) of when the application was uploaded</p>
+        addedAtTimestamp:
+          type: integer
+          description: Same as addedTimestamp; some responses use this name
+        clusterName:
+          type: string
+          description: Cluster hosting the application
+        syncGit:
+          $ref: "#/components/schemas/SyncGit"
     AppResponse:
       type: object
       properties:
@@ -490,7 +530,7 @@ components:
               type: array
               items:
                 type: string
-              description: IDs of the applications that were stopped
+              description: IDs of the applications that were stopped (the key is spelled `stoped` by the API)
             alreadyOffline:
               type: array
               items:
@@ -537,7 +577,7 @@ components:
               type: array
               items:
                 type: string
-              description: IDs of the applications that were removed
+              description: IDs of the applications that were removed (the key is spelled `removealled` by the API)
             alreadyOffline:
               type: array
               items:
@@ -731,6 +771,7 @@ components:
           description: Whether the application was terminated due to RAM usage
         exitCode:
           type: integer
+          nullable: true
           description: Exit code of the application if it has stopped
         lang:
           type: string
@@ -953,21 +994,6 @@ components:
       type: object
       required:
         - cmd
-    ExecOutput:
-      properties:
-        stdout:
-          type: string
-          description: Standard output from the command
-          x-gitbook-description-html: <p>Standard output from the command</p>
-        stderr:
-          type: string
-          description: Standard error from the command
-          x-gitbook-description-html: <p>Standard error from the command</p>
-        exitCode:
-          type: integer
-          description: Exit code of the command
-          x-gitbook-description-html: <p>Exit code of the command</p>
-      type: object
     ExecResponse:
       properties:
         status:
@@ -977,10 +1003,25 @@ components:
         message:
           type: string
         exec:
-          oneOf:
-            - $ref: "#/components/schemas/ExecOutput"
-            - type: object
-              nullable: true
+          type: object
+          nullable: true
+          description: >-
+            Command output (same fields as ExecOutput), or null when the
+            application is offline. Inlined because OpenAPI 3.0 cannot mark a
+            $ref as nullable.
+          properties:
+            stdout:
+              type: string
+              description: Standard output from the command
+              x-gitbook-description-html: <p>Standard output from the command</p>
+            stderr:
+              type: string
+              description: Standard error from the command
+              x-gitbook-description-html: <p>Standard error from the command</p>
+            exitCode:
+              type: integer
+              description: Exit code of the command
+              x-gitbook-description-html: <p>Exit code of the command</p>
       type: object
     Subdomain:
       type: object
@@ -1076,6 +1117,690 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CustomDomain"
+    StatusMessageResponse:
+      type: object
+      description: Generic response that only carries a status and a message.
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - error
+        message:
+          type: string
+    SyncGit:
+      type: object
+      nullable: true
+      description: Git synchronization settings, when the application is linked to a repository.
+      properties:
+        autoDeploy:
+          type: boolean
+        repositoryID:
+          type: integer
+        branchName:
+          type: string
+        lastCommit:
+          type: object
+          properties:
+            message:
+              type: string
+            sha:
+              type: string
+    EnvVarsMap:
+      type: object
+      description: Variable name to value.
+      additionalProperties:
+        type: string
+    EnvVarsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            vars:
+              $ref: "#/components/schemas/EnvVarsMap"
+    EnvVarsDeleteResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            removed:
+              type: integer
+              description: Number of variables removed
+    Project:
+      type: object
+      description: A project. Routes return different subsets of these fields.
+      properties:
+        _id:
+          type: string
+        ownerID:
+          type: string
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+        icon:
+          type: string
+        teamID:
+          type: string
+          nullable: true
+        clusterName:
+          type: string
+    ProjectApp:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Application ID
+        nameTAG:
+          type: string
+        clusterName:
+          type: string
+    ProjectResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/Project"
+    ProjectListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+    ProjectDetailsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            project:
+              type: object
+              properties:
+                _id:
+                  type: string
+                name:
+                  type: string
+                memberRole:
+                  type: string
+            team:
+              type: object
+              nullable: true
+              description: Linked team (undocumented shape)
+            apps:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProjectApp"
+    ProjectAppListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectApp"
+    ProjectAppLinkResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+              description: Application ID
+            projectID:
+              type: string
+            clusterName:
+              type: string
+    ProjectMigrationResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - accepted
+        message:
+          type: string
+        code:
+          type: string
+          enum:
+            - MIGRATION_STARTED
+        data:
+          type: object
+          properties:
+            appID:
+              type: string
+            projectID:
+              type: string
+            from:
+              type: string
+              description: Source cluster
+            to:
+              type: string
+              description: Destination cluster
+            estimatedSec:
+              type: integer
+    BackupId:
+      description: >-
+        Backup identifier. Documented as a string, but some responses send it
+        as a number; clients should accept both.
+      oneOf:
+        - type: string
+        - type: integer
+    DatabasePreset:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/DatabaseEngineType"
+        versions:
+          type: array
+          items:
+            type: string
+        extensions:
+          type: array
+          items:
+            type: string
+        defaultPort:
+          type: integer
+        suggestedDisplayName:
+          type: string
+        suggestedDbName:
+          type: string
+        suggestedUser:
+          type: string
+        suggestedPassword:
+          type: string
+        vars:
+          type: object
+          properties:
+            required:
+              type: array
+              items:
+                type: string
+            optional:
+              type: array
+              items:
+                type: string
+            fromSuggestions:
+              type: object
+              description: Environment variable name to suggestion field name
+              additionalProperties:
+                type: string
+    DatabaseEngineType:
+      type: string
+      enum:
+        - postgres
+        - mysql
+        - mariadb
+        - mongodb
+        - redis
+        - valkey
+        - clickhouse
+    DatabasePresetListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            databases:
+              type: array
+              items:
+                $ref: "#/components/schemas/DatabasePreset"
+    DatabaseNamesResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            suggestedDisplayName:
+              type: string
+            suggestedDbName:
+              type: string
+            suggestedUser:
+              type: string
+    DatabaseSummary:
+      type: object
+      properties:
+        _id:
+          type: string
+        userID:
+          type: string
+        displayName:
+          type: string
+        projectID:
+          type: string
+          nullable: true
+        db:
+          type: object
+          properties:
+            type:
+              type: string
+            version:
+              type: string
+            port:
+              type: integer
+        clusterName:
+          type: string
+        totalRam:
+          type: integer
+        hostname:
+          type: string
+        addedAtTimestamp:
+          type: integer
+    DatabaseListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseSummary"
+    DatabaseCreatedResponse:
+      type: object
+      description: Provisioning is asynchronous; poll GET /database/{dbID} with the returned ID.
+      properties:
+        status:
+          type: string
+        id:
+          type: string
+          description: ID of the new database
+        message:
+          type: string
+    Database:
+      type: object
+      properties:
+        _id:
+          type: string
+        projectID:
+          type: string
+          nullable: true
+        clusterName:
+          type: string
+        hostname:
+          type: string
+        displayName:
+          type: string
+        dbType:
+          type: string
+          description: Database family (e.g. postgresql)
+        dbEngine:
+          type: string
+          description: Engine (e.g. postgres)
+        dbVersion:
+          type: string
+        extensions:
+          type: array
+          items:
+            type: string
+        totalRam:
+          type: integer
+        owner:
+          type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+              nullable: true
+            avatar:
+              type: string
+              nullable: true
+        perms:
+          type: object
+          nullable: true
+          description: Your permissions when you are not the owner (undocumented shape)
+        vars:
+          $ref: "#/components/schemas/EnvVarsMap"
+        online:
+          type: boolean
+        exists:
+          type: boolean
+        totalUsedRam:
+          type: number
+        last_restart:
+          type: string
+        dataVolumeSizeHuman:
+          type: string
+    DatabaseResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        database:
+          $ref: "#/components/schemas/Database"
+    DatabaseUpdateResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        rebuilding:
+          type: boolean
+          description: Whether the change triggered a rebuild of the container
+        data:
+          type: object
+          properties:
+            _id:
+              type: string
+            displayName:
+              type: string
+            totalRam:
+              type: integer
+            hostname:
+              type: string
+    DatabaseBackupCreatedResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            backupId:
+              $ref: "#/components/schemas/BackupId"
+            downloadUrl:
+              type: string
+    DatabaseBackupListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            backups:
+              type: array
+              items:
+                type: object
+                properties:
+                  backupId:
+                    $ref: "#/components/schemas/BackupId"
+                  createdAt:
+                    type: string
+                    format: date-time
+                  size:
+                    type: integer
+            nextCursor:
+              type: string
+              nullable: true
+    DatabaseDownloadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        data:
+          type: object
+          properties:
+            downloadUrl:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+    DatabaseLogsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        app:
+          type: object
+          properties:
+            _id:
+              type: string
+            terminal:
+              type: object
+              properties:
+                big:
+                  type: string
+                small:
+                  type: string
+                url:
+                  type: string
+                  nullable: true
+    TeamRole:
+      type: string
+      description: Team role. These are the documented roles.
+      enum:
+        - admin
+        - developer
+        - viewer
+    Team:
+      type: object
+      properties:
+        _id:
+          type: string
+        ownerID:
+          type: string
+        name:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+        isOwner:
+          type: boolean
+    TeamMember:
+      type: object
+      properties:
+        userID:
+          type: string
+        role:
+          type: string
+        username:
+          type: string
+    TeamResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/Team"
+    TeamListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+    TeamsAppListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              nameTAG:
+                type: string
+              teamID:
+                type: string
+    TeamRolePermissionsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            role:
+              type: string
+            permissions:
+              type: array
+              items:
+                type: string
+    TeamDetailsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            team:
+              $ref: "#/components/schemas/Team"
+            members:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamMember"
+            projects:
+              type: array
+              items:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  name:
+                    type: string
+    TeamMemberResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          $ref: "#/components/schemas/TeamMember"
+    TeamMemberListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMember"
+    SnapshotAppRef:
+      type: object
+      properties:
+        id:
+          type: string
+    SnapshotListResponse:
+      type: object
+      description: >-
+        Without `appID`, a page of snapshots of every application (`page`,
+        `limit`, `total`, `backups`). With `appID`, the versions of that
+        application (`app`, `versions`).
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        backups:
+          type: array
+          description: Snapshot entries (undocumented shape)
+          items:
+            type: object
+        app:
+          $ref: "#/components/schemas/SnapshotAppRef"
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version:
+                type: string
+              size:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+    AppSnapshotListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        app:
+          $ref: "#/components/schemas/SnapshotAppRef"
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version:
+                type: string
+                description: YYYYMMDD-HHMMSS
+              size:
+                type: integer
+                description: Size in bytes
+              date:
+                type: integer
+                description: Creation time in milliseconds
+  responses:
+    Forbidden:
+      description: Missing permission or plan limitation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: error
+            message: You do not have permission for this action.
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StatusMessageResponse"
+          example:
+            status: error
+            message: App not found
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
@@ -2430,7 +3155,7 @@ paths:
   /app/{appID}/profile:
     put:
       tags:
-        - Applications
+        - App Profiles
       summary: Update application profile
       description: >-
         Updates the profile information (avatar and name) for a specific application.
@@ -2519,7 +3244,7 @@ paths:
   /app/{appID}/explorer:
     get:
       tags:
-        - Applications
+        - File Explorer
       summary: List files and directories
       description: List files and directories in the application's directory
       operationId: listExplorer
@@ -2615,7 +3340,7 @@ paths:
       x-gitbook-description-html: <p>List files and directories in the application's directory</p>
     post:
       tags:
-        - Applications
+        - File Explorer
       summary: Create file or directory
       description: Create a new file or directory in the application
       operationId: createExplorer
@@ -2714,7 +3439,7 @@ paths:
   /app/{appID}/explorer/open:
     get:
       tags:
-        - Applications
+        - File Explorer
       summary: Open/read file
       description: Read the contents of a file in the application
       operationId: openExplorer
@@ -2808,7 +3533,7 @@ paths:
   /app/{appID}/explorer/edit:
     put:
       tags:
-        - Applications
+        - File Explorer
       summary: Edit file
       description: Edit the contents of a file in the application
       operationId: editExplorer
@@ -3035,6 +3760,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags:
         - Applications
@@ -3069,6 +3796,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /app/{appID}/console:
     put:
       tags:
@@ -3242,6 +3971,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags:
         - App Moderators
@@ -3293,6 +4026,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags:
         - App Moderators
@@ -3338,6 +4075,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /app/{appID}/team/{modID}:
     delete:
       tags:
@@ -3364,18 +4105,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
+                $ref: "#/components/schemas/StatusMessageResponse"
         "401":
           description: Authentication error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team:
     get:
       tags:
@@ -3459,6 +4199,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /team/{appID}/logs:
     get:
       tags:
@@ -3488,6 +4230,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/backup:
     get:
       tags:
@@ -3517,6 +4263,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/start:
     put:
       tags:
@@ -3546,6 +4296,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/restart:
     put:
       tags:
@@ -3575,6 +4329,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/stop:
     put:
       tags:
@@ -3604,6 +4362,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/ram:
     put:
       tags:
@@ -3641,6 +4403,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /team/{appID}/commit:
     put:
       tags:
@@ -3683,6 +4449,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /subdomain/all:
     get:
       tags:
@@ -3763,13 +4533,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-        "409":
-          description: Subdomain already registered
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
     post:
       tags:
         - Subdomains
@@ -3843,12 +4606,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: Subdomain removed successfully
@@ -4291,13 +5049,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
-                  message:
-                    type: string
+                $ref: "#/components/schemas/SnapshotListResponse"
               examples:
                 allApps:
                   summary: All user backups
@@ -4627,21 +5379,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-                  app:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                  versions:
-                    type: array
-                    items:
-                      type: object
+                $ref: "#/components/schemas/AppSnapshotListResponse"
               example:
                 status: ok
                 message: Backups for this app were successfully loaded
@@ -4841,7 +5579,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -4889,7 +5627,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -4927,7 +5665,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsDeleteResponse"
               example:
                 status: ok
                 data:
@@ -4961,7 +5699,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -5025,7 +5763,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -5080,7 +5818,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsDeleteResponse"
               example:
                 status: ok
                 data:
@@ -5128,7 +5866,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -5192,7 +5930,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsResponse"
               example:
                 status: ok
                 data:
@@ -5247,7 +5985,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/EnvVarsDeleteResponse"
               example:
                 status: ok
                 data:
@@ -5314,7 +6052,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectResponse"
               example:
                 status: ok
                 message: Project created successfully
@@ -5360,7 +6098,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectListResponse"
               example:
                 status: ok
                 message: Projects listed successfully
@@ -5398,7 +6136,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectDetailsResponse"
               example:
                 status: ok
                 message: Project loaded successfully
@@ -5468,7 +6206,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectResponse"
               example:
                 status: ok
                 message: Project updated successfully
@@ -5524,7 +6262,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: Project deleted successfully
@@ -5584,7 +6322,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectResponse"
               example:
                 status: ok
                 message: Team linked to the project successfully
@@ -5641,7 +6379,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectAppListResponse"
               example:
                 status: ok
                 data:
@@ -5709,7 +6447,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectAppLinkResponse"
               example:
                 status: ok
                 message: App added to the project successfully
@@ -5723,7 +6461,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/ProjectMigrationResponse"
               example:
                 status: accepted
                 message: Migration started
@@ -5796,7 +6534,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: App removed from the project successfully
@@ -5840,7 +6578,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabasePresetListResponse"
               example:
                 status: ok
                 data:
@@ -5897,7 +6635,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseNamesResponse"
               example:
                 status: ok
                 data:
@@ -5935,7 +6673,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseListResponse"
               example:
                 status: ok
                 data:
@@ -6031,7 +6769,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseCreatedResponse"
               example:
                 status: ok
                 id: 1714500000365db
@@ -6095,7 +6833,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseResponse"
               example:
                 status: ok
                 message: Database status loaded.
@@ -6189,7 +6927,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseUpdateResponse"
               example:
                 status: ok
                 message: Database updated successfully.
@@ -6262,10 +7000,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
-                message: Your application has been removed.
+                message: Your database has been removed.
           x-gitbook-description-html: <p>Database deleted</p>
         "401":
           description: Authentication error
@@ -6316,10 +7054,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
-                message: Your application has been connected.
+                message: Your database has been started.
           x-gitbook-description-html: <p>Started successfully</p>
         "401":
           description: Authentication error or start failure
@@ -6370,10 +7108,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
-                message: Your application has been turned off.
+                message: Your database has been stopped.
           x-gitbook-description-html: <p>Stopped successfully</p>
         "401":
           description: Authentication error
@@ -6424,10 +7162,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
-                message: Your application has been restarted.
+                message: Your database has been restarted.
           x-gitbook-description-html: <p>Restarted successfully</p>
         "401":
           description: Authentication error or restart failure
@@ -6492,7 +7230,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseBackupCreatedResponse"
               example:
                 status: ok
                 data:
@@ -6583,7 +7321,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseBackupListResponse"
               example:
                 status: ok
                 data:
@@ -6649,7 +7387,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseDownloadResponse"
               example:
                 status: ok
                 data:
@@ -6736,7 +7474,7 @@ paths:
                     version:
                       type: string
             example:
-              backupId: 20240101120000
+              backupId: "20240101120000"
               totalRam: 512
               displayName: Restored Postgres
       responses:
@@ -6745,7 +7483,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseCreatedResponse"
               example:
                 status: ok
                 id: 1714500000999db
@@ -6807,10 +7545,10 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DatabaseLogsResponse"
               example:
                 status: ok
-                message: Your application logs have been loaded
+                message: Your database logs have been loaded
                 app:
                   _id: 1714500000365db
                   terminal:
@@ -6859,7 +7597,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
           x-gitbook-description-html: <p>Logs deleted</p>
@@ -6915,7 +7653,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamResponse"
               example:
                 status: ok
                 message: Team created successfully
@@ -6958,7 +7696,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamListResponse"
               example:
                 status: ok
                 message: Teams listed successfully
@@ -6988,7 +7726,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamsAppListResponse"
               example:
                 status: ok
                 message: Apps accessible via teams
@@ -7018,14 +7756,14 @@ paths:
           required: true
           description: Role (admin, developer or viewer)
           schema:
-            type: string
+            $ref: "#/components/schemas/TeamRole"
       responses:
         "200":
           description: Role permissions
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamRolePermissionsResponse"
               example:
                 status: ok
                 message: Permissions for role admin
@@ -7071,7 +7809,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamDetailsResponse"
               example:
                 status: ok
                 message: Team details
@@ -7140,7 +7878,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamResponse"
               example:
                 status: ok
                 message: Team updated successfully
@@ -7196,7 +7934,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: Team deleted successfully
@@ -7261,7 +7999,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamMemberResponse"
               example:
                 status: ok
                 message: Member added successfully
@@ -7318,7 +8056,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamMemberListResponse"
               example:
                 status: ok
                 message: Members listed successfully
@@ -7389,7 +8127,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/TeamMemberResponse"
               example:
                 status: ok
                 message: Role updated successfully
@@ -7451,7 +8189,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: Member removed successfully
@@ -7498,7 +8236,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/StatusMessageResponse"
               example:
                 status: ok
                 message: You have left the team successfully

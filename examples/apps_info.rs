@@ -1,24 +1,27 @@
-extern crate discloud_rs;
-use std::env;
+//! Lists your applications, or shows one when an ID is given.
+//!
+//! `cargo run --example apps_info [-- APP_ID]`
 
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
-
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let apps = client.get_all_apps().await.unwrap();
-
-    println!("All apps fetched: {apps:?}");
-
-    match apps.first() {
-        Some(a) => {
-            let app = client.get_app(&a.id).await.unwrap();
-            println!("Fetched unique app: {app:#?}");
-        }
+async fn main() -> Result<(), Box<dyn Error>> {
+    let client = client()?;
+    match std::env::args().nth(1) {
+        Some(id) => println!("{:#?}", client.get_app(&id).await?),
         None => {
-            println!("No app to fetch unique");
+            for app in client.get_all_apps().await? {
+                let state = if app.online { "online" } else { "offline" };
+                println!("{:<16} {:<30} {state:<8} {} MB", app.id, app.name, app.ram);
+            }
         }
     }
+    Ok(())
 }

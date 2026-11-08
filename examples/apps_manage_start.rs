@@ -1,31 +1,30 @@
-extern crate discloud_rs;
-use std::env;
+//! Starts an application.
+//!
+//! `cargo run --example apps_manage_start -- APP_ID`
 
-use discloud_rs::AppStartError;
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
+fn app_id_arg() -> Result<String, Box<dyn Error>> {
+    std::env::args()
+        .nth(1)
+        .ok_or_else(|| "pass the application ID as the first argument".into())
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
+async fn main() -> Result<(), Box<dyn Error>> {
+    use discloud_rs::AppStartError;
 
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let apps = client.get_all_apps().await.unwrap();
-
-    println!("All apps fetched: {apps:?}");
-
-    match apps.first() {
-        Some(app) => {
-            match app.start(&client).await {
-                // Or client.start_app(&a.id);
-                Ok(_) => println!("Started app: {app:#?}"),
-                Err(error) => match error {
-                    AppStartError::AlreadyOnline => println!("App already online"),
-                    AppStartError::Other(e) => println!("Other error: {e:#?}"),
-                },
-            };
-        }
-        None => {
-            println!("No app to start");
-        }
+    match client()?.start_app(&app_id_arg()?).await {
+        Ok(status) => println!("Started: online = {}", status.online),
+        Err(AppStartError::AlreadyOnline) => println!("The application is already online"),
+        Err(e) => return Err(e.into()),
     }
+    Ok(())
 }

@@ -1,15 +1,23 @@
-extern crate discloud_rs;
+//! Changes the language of the API messages.
+//!
+//! `cargo run --example locale -- en-US`
 
-use dotenvy::dotenv;
-use std::env;
+use std::error::Error;
 
-use discloud_rs::Locale;
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
 
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
-
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    client.set_locale(Locale::PtBR).await.unwrap();
+async fn main() -> Result<(), Box<dyn Error>> {
+    let locale: discloud_rs::Locale = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "en-US".into())
+        .parse()?;
+    client()?.set_locale(locale).await?;
+    println!("Locale set to {locale}");
+    Ok(())
 }
