@@ -1,31 +1,36 @@
-extern crate discloud_rs;
-use std::env;
+//! Changes the RAM of an application.
+//!
+//! `cargo run --example apps_manage_ram -- APP_ID 256`
 
-use discloud_rs::AppRamError;
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
+fn app_id_arg() -> Result<String, Box<dyn Error>> {
+    std::env::args()
+        .nth(1)
+        .ok_or_else(|| "pass the application ID as the first argument".into())
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
+async fn main() -> Result<(), Box<dyn Error>> {
+    use discloud_rs::AppRamError;
 
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
+    let id = app_id_arg()?;
+    let ram: u32 = std::env::args()
+        .nth(2)
+        .ok_or("pass the RAM in MB as the second argument")?
+        .parse()?;
 
-    let apps = client.get_all_apps().await.unwrap();
-
-    println!("All apps fetched: {apps:?}");
-
-    match apps.first() {
-        Some(app) => {
-            match app.set_ram(&client, 100).await {
-                // Or client.set_app_ram(&a.id);
-                Ok(_) => println!("Changed app ram: {app:#?}"),
-                Err(error) => match error {
-                    AppRamError::ForbiddenQuantity(message) => println!("{message}"),
-                    AppRamError::Other(_e) => {}
-                },
-            };
-        }
-        None => {
-            println!("No app to change ram");
-        }
+    match client()?.set_app_ram(&id, ram).await {
+        Ok(()) => println!("RAM set to {ram} MB"),
+        Err(AppRamError::ForbiddenQuantity(reason)) => println!("Not allowed: {reason}"),
+        Err(e) => return Err(e.into()),
     }
+    Ok(())
 }

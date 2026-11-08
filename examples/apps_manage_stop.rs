@@ -1,31 +1,30 @@
-extern crate discloud_rs;
-use std::env;
+//! Stops an application.
+//!
+//! `cargo run --example apps_manage_stop -- APP_ID`
 
-use discloud_rs::AppStopError;
-use dotenvy::dotenv;
+use std::error::Error;
+
+use discloud_rs::Discloud;
+
+fn client() -> Result<Discloud, Box<dyn Error>> {
+    dotenvy::dotenv().ok();
+    Ok(Discloud::new(std::env::var("DISCLOUD_TOKEN")?))
+}
+
+fn app_id_arg() -> Result<String, Box<dyn Error>> {
+    std::env::args()
+        .nth(1)
+        .ok_or_else(|| "pass the application ID as the first argument".into())
+}
+
 #[tokio::main]
-async fn main() {
-    dotenv().unwrap();
+async fn main() -> Result<(), Box<dyn Error>> {
+    use discloud_rs::AppStopError;
 
-    let client = discloud_rs::Discloud::new(&env::var("DISCLOUD_TOKEN").unwrap());
-
-    let apps = client.get_all_apps().await.unwrap();
-
-    println!("All apps fetched: {apps:?}");
-
-    match apps.first() {
-        Some(app) => {
-            match app.stop(&client).await {
-                // Or client.stop_app(&a.id);
-                Ok(_) => println!("Stopped app: {app:#?}"),
-                Err(error) => match error {
-                    AppStopError::AlreadyOffline => println!("App is already offline"),
-                    AppStopError::Other(e) => println!("Other error: {e:#?}"),
-                },
-            };
-        }
-        None => {
-            println!("No app to stop");
-        }
+    match client()?.stop_app(&app_id_arg()?).await {
+        Ok(()) => println!("Stopped"),
+        Err(AppStopError::AlreadyOffline) => println!("The application is already offline"),
+        Err(e) => return Err(e.into()),
     }
+    Ok(())
 }

@@ -1,8 +1,5 @@
+/target
 /.idea
 /.vscode
-/target
-/example/target
-.envrc/
-Cargo.lock
+/.direnv
 .env
-.direnv/

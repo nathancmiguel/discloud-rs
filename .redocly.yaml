@@ -1,0 +1,5 @@
+extends:
+  - recommended
+rules:
+  # The API is proprietary; the spec does not define a license for it.
+  info-license: off
